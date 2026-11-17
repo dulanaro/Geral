@@ -96,6 +96,26 @@ python3 .claude/skills/dfmed/scripts/dfmed.py agenda-dia --ag 123 --ini 2026-11-
 Depois, para abrir o prontuário de um paciente da agenda, use o `pacID` do
 horário em `prontuario-list --pac <pacID>`.
 
+### Dashboard (perfil dos pacientes)
+
+Gera um painel com **idade, sexo e comorbidades** dos pacientes.
+
+1. Gere as estatísticas agregadas (anonimizadas — sem nomes/CPF):
+   ```bash
+   python3 .claude/skills/dfmed/scripts/dfmed.py dashboard-dados --full --progress --out stats.json
+   ```
+   - `--full` busca a ficha completa de cada paciente (necessário para sexo e
+     para a estimativa de comorbidades); sem ela, usa só o resultado da busca.
+   - Idade e sexo saem exatos; **comorbidades são estimativa por palavra-chave**
+     nos campos de texto livre (`dadosImportantes`, `outrasInfo`) — não há campo
+     clínico estruturado no DFMed. Termos ajustáveis no dict `COMORBIDADES` do
+     script.
+2. Abra `dashboard.html`, substitua o objeto `STATS` pelo conteúdo de
+   `stats.json` e remova `exemplo: true`.
+3. Publique como artifact (Artifact tool) com o mesmo `file_path` para atualizar
+   o painel. O arquivo já vem com dados de exemplo rotulados para visualizar o
+   layout antes de ter dados reais.
+
 ### Endpoint cru (para algo não coberto acima)
 
 ```bash

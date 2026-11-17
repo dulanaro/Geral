@@ -254,6 +254,166 @@ def cmd_prontuario_save(a):
     out(post_json("Prontuario/Save", body))
 
 
+COMORBIDADES = {
+    "Hipertensão": ["hipertens", "has ", " has,", " has.", "pressao alta", "pressão alta"],
+    "Diabetes": ["diabet", "dm1", "dm2", "dm ", " dm,", " dm."],
+    "Dislipidemia": ["dislipidem", "colesterol", "hipercolesterol", "triglicer"],
+    "Obesidade": ["obesidad", "obeso", "obesa", "sobrepeso"],
+    "Asma": ["asma", "asmat"],
+    "DPOC": ["dpoc", "bronquite cronica", "enfisema"],
+    "Hipotireoidismo": ["hipotireoid", "tireoid"],
+    "Cardiopatia": ["cardiopat", "insuf cardiac", "insuficiencia cardiac", "icc", "arritmia", "infarto", "iam"],
+    "Depressão/Ansiedade": ["depress", "ansiedad", "transtorno de humor", "bipolar", "panico", "pânico"],
+    "Doença renal": ["renal cronic", "drc", "insuf renal", "insuficiencia renal", "dialise", "diálise"],
+    "Câncer/Neoplasia": ["cancer", "câncer", "neoplas", "tumor", "oncolog", "quimioterap"],
+    "AVC": ["avc", "acidente vascular", "derrame"],
+    "Tabagismo": ["tabagis", "fumante", "tabaco"],
+    "Alergia": ["alergi", "alergic"],
+}
+
+_ACENTOS = str.maketrans("áàâãäéèêëíìîïóòôõöúùûüç", "aaaaaeeeeiiiiooooouuuuc")
+
+
+def _norm(s):
+    return (s or "").lower().translate(_ACENTOS)
+
+
+def _idade(dtnasc):
+    """Tenta extrair idade (anos) de uma data de nascimento em formatos comuns."""
+    import re
+    from datetime import date
+
+    if not dtnasc:
+        return None
+    s = str(dtnasc)[:10]
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})", s) or re.match(
+        r"(\d{2})/(\d{2})/(\d{4})", s
+    )
+    if not m:
+        return None
+    g = m.groups()
+    if len(g[0]) == 4:
+        y, mo, d = int(g[0]), int(g[1]), int(g[2])
+    else:
+        d, mo, y = int(g[0]), int(g[1]), int(g[2])
+    if not (1 <= mo <= 12 and 1 <= d <= 31 and 1900 <= y <= date.today().year):
+        return None
+    t = date.today()
+    return t.year - y - ((t.month, t.day) < (mo, d))
+
+
+def _faixa(idade):
+    if idade is None:
+        return "sem_data"
+    for lo, hi, label in [
+        (0, 12, "0-12"),
+        (13, 17, "13-17"),
+        (18, 29, "18-29"),
+        (30, 39, "30-39"),
+        (40, 49, "40-49"),
+        (50, 59, "50-59"),
+        (60, 69, "60-69"),
+        (70, 200, "70+"),
+    ]:
+        if lo <= idade <= hi:
+            return label
+    return "sem_data"
+
+
+def _sexo_label(v):
+    s = _norm(str(v)).strip()
+    if s in ("m", "masculino", "1", "homem"):
+        return "Masculino"
+    if s in ("f", "feminino", "2", "mulher"):
+        return "Feminino"
+    return "Não informado"
+
+
+def cmd_dashboard_dados(a):
+    import datetime
+
+    lista = post_json(
+        "CadPac/BuscaPaciente",
+        {"nome": "", "celular": "", "dtNasc": "", "limite": a.limite},
+    )
+    if isinstance(lista, dict):
+        lista = lista.get("itens") or lista.get("lista") or lista.get("dados") or []
+    if not isinstance(lista, list):
+        die("Resposta inesperada de BuscaPaciente; use 'raw' para inspecionar.")
+
+    total = len(lista)
+    sexo = {}
+    faixas = {}
+    comorb = {k: 0 for k in COMORBIDADES}
+    com_texto = 0
+    sem_nasc = 0
+    idades = []
+
+    for i, p in enumerate(lista):
+        if not isinstance(p, dict):
+            continue
+        reg = p
+        # Precisa da ficha completa p/ sexo e campos de texto? Busca se pedido.
+        if a.full and p.get("pacID") is not None:
+            try:
+                reg = get_json("CadPac/GetGui?" + q({"pacID": p["pacID"]})) or p
+            except SystemExit:
+                reg = p
+            if a.progress and (i + 1) % 25 == 0:
+                print("... %d/%d" % (i + 1, total), file=sys.stderr)
+
+        idade = _idade(reg.get("dtNasc") or reg.get("dataNasc") or reg.get("nascimento"))
+        if idade is None:
+            sem_nasc += 1
+        else:
+            idades.append(idade)
+        f = _faixa(idade)
+        faixas[f] = faixas.get(f, 0) + 1
+        sx = _sexo_label(reg.get("sexo"))
+        sexo[sx] = sexo.get(sx, 0) + 1
+
+        texto = _norm(
+            " ".join(
+                str(reg.get(c, ""))
+                for c in ("dadosImportantes", "outrasInfo", "obsAdmin", "observ")
+            )
+        )
+        if texto.strip():
+            com_texto += 1
+            for nome, termos in COMORBIDADES.items():
+                if any(t in texto for t in termos):
+                    comorb[nome] += 1
+
+    comorb = {k: v for k, v in sorted(comorb.items(), key=lambda x: -x[1]) if v > 0}
+    idade_media = round(sum(idades) / len(idades), 1) if idades else None
+    idade_mediana = None
+    if idades:
+        s = sorted(idades)
+        n = len(s)
+        idade_mediana = s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2
+    stats = {
+        "gerado_em": datetime.date.today().isoformat(),
+        "total_pacientes": total,
+        "idade_media": idade_media,
+        "idade_mediana": idade_mediana,
+        "sexo": sexo,
+        "faixas_etarias": faixas,
+        "sem_data_nascimento": sem_nasc,
+        "comorbidades": {
+            "metodo": "estimativa por palavra-chave em campos de texto livre"
+            + (" (ficha completa)" if a.full else " (apenas resultado da busca)"),
+            "pacientes_com_texto_analisado": com_texto,
+            "contagem": comorb,
+        },
+    }
+    if a.out:
+        with open(a.out, "w", encoding="utf-8") as fh:
+            json.dump(stats, fh, ensure_ascii=False, indent=2)
+        print("Estatísticas gravadas em %s" % a.out)
+    else:
+        out(stats)
+
+
 def cmd_raw(a):
     body = json.loads(a.body) if a.body else None
     if body is None and a.method == "GET":
@@ -334,6 +494,20 @@ def build_parser():
     sp = add("prontuario-save", cmd_prontuario_save, "Grava/edita um registro (ESCRITA)")
     sp.add_argument("--file", required=True, help="JSON do registro")
     sp.add_argument("--yes", action="store_true")
+
+    sp = add(
+        "dashboard-dados",
+        cmd_dashboard_dados,
+        "Gera estatísticas agregadas (idade/sexo/comorbidades) para o dashboard",
+    )
+    sp.add_argument("--limite", type=int, default=100000, help="máx. de pacientes")
+    sp.add_argument(
+        "--full",
+        action="store_true",
+        help="busca a ficha completa de cada paciente (exato para sexo e comorbidades; mais lento)",
+    )
+    sp.add_argument("--progress", action="store_true", help="mostra progresso (com --full)")
+    sp.add_argument("--out", help="grava o JSON num arquivo em vez de imprimir")
 
     sp = add("raw", cmd_raw, "Chamada crua a um endpoint")
     sp.add_argument("--method", default="GET", choices=["GET", "POST"])

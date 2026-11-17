@@ -1,0 +1,295 @@
+<title>Perfil de Pacientes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+  /* Layout: coluna única com cabeçalho, faixa de indicadores e três painéis de gráfico */
+  :root {
+    color-scheme: light;
+    --bg: #f6f6f4;
+    --surface: #fcfcfb;
+    --surface-2: #f0efec;
+    --border: #e2e1dc;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-3: #8a897f;
+    --accent: #2a78d6;
+    --c-fem: #eb6834;
+    --c-masc: #2a78d6;
+    --c-ni: #9a988d;
+    --track: #ebeae5;
+    --font-head: "Space Grotesk", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #121211;
+      --surface: #1a1a19;
+      --surface-2: #232320;
+      --border: #333330;
+      --ink: #f0efec;
+      --ink-2: #c3c2b7;
+      --ink-3: #908f85;
+      --accent: #3987e5;
+      --c-fem: #d95926;
+      --c-masc: #3987e5;
+      --c-ni: #74736a;
+      --track: #2a2a27;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a19;
+    --surface-2: #232320;
+    --border: #333330;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --ink-3: #908f85;
+    --accent: #3987e5;
+    --c-fem: #d95926;
+    --c-masc: #3987e5;
+    --c-ni: #74736a;
+    --track: #2a2a27;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font-body); line-height: 1.5; }
+  .wrap {
+    max-width: 960px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 28px 56px;
+  }
+  header { margin-bottom: 20px; }
+  h1 { font-family: var(--font-head); font-weight: 700; font-size: clamp(1.6rem, 4vw, 2.2rem); margin: 0 0 6px; letter-spacing: -0.01em; text-wrap: balance; }
+  .source { color: var(--ink-2); font-size: 0.9rem; }
+  .source b { color: var(--ink); font-weight: 600; }
+  .banner {
+    margin: 14px 0 4px; padding: 10px 14px; border-radius: 10px;
+    background: color-mix(in srgb, var(--c-fem) 14%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--c-fem) 40%, var(--border));
+    color: var(--ink); font-size: 0.86rem;
+  }
+  .banner strong { font-weight: 600; }
+
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 22px 0; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .tile .k { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); font-weight: 600; }
+  .tile .v { font-family: var(--font-head); font-weight: 600; font-size: 1.9rem; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .tile .u { font-size: 0.8rem; color: var(--ink-2); }
+
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .panel h2 { font-family: var(--font-head); font-weight: 600; font-size: 1.05rem; margin: 0 0 2px; }
+  .panel .sub { color: var(--ink-3); font-size: 0.82rem; margin: 0 0 16px; }
+
+  /* barras horizontais (sexo, comorbidades) */
+  .hbars { display: flex; flex-direction: column; gap: 10px; }
+  .hbar { display: grid; grid-template-columns: 150px 1fr auto; align-items: center; gap: 12px; }
+  .hbar .lbl { font-size: 0.86rem; color: var(--ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar .track { background: var(--track); border-radius: 5px; height: 22px; position: relative; overflow: hidden; }
+  .hbar .fill { height: 100%; border-radius: 5px; min-width: 2px; transition: width .2s; }
+  .hbar .val { font-size: 0.86rem; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 500; min-width: 64px; text-align: right; }
+  .hbar .val span { color: var(--ink-3); font-weight: 400; }
+
+  /* histograma vertical (faixas etárias) */
+  .vbars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; align-items: end; height: 220px; padding-top: 10px; }
+  .vcol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; }
+  .vcol .bar { width: 100%; max-width: 46px; background: var(--accent); border-radius: 5px 5px 0 0; min-height: 3px; transition: height .2s; }
+  .vcol .n { font-size: 0.78rem; font-variant-numeric: tabular-nums; color: var(--ink); font-weight: 600; }
+  .vcol .x { font-size: 0.74rem; color: var(--ink-2); margin-top: 2px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 0.82rem; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  .toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+  button.toggle { font: inherit; font-size: 0.82rem; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button.toggle:hover { color: var(--ink); }
+  button.toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 0.86rem; margin-top: 6px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  caption { text-align: left; color: var(--ink-3); font-size: 0.8rem; padding: 6px 0; }
+
+  footer { color: var(--ink-3); font-size: 0.78rem; margin-top: 24px; line-height: 1.6; }
+
+  @media (max-width: 560px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .hbar { grid-template-columns: 110px 1fr auto; gap: 8px; }
+    .vbars { height: 180px; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Perfil de Pacientes</h1>
+    <p class="source">Prontuário <b>DFMed</b> · gerado em <b id="s-data">—</b> · <b id="s-total">—</b> pacientes</p>
+    <div class="banner" id="banner" hidden><strong>Dados de exemplo.</strong> Esta é a demonstração do layout. Os números reais entram quando o dashboard é gerado a partir da sua conta DFMed.</div>
+  </header>
+
+  <section class="tiles" aria-label="Indicadores">
+    <div class="tile"><div class="k">Pacientes</div><div class="v" id="t-total">—</div></div>
+    <div class="tile"><div class="k">Idade média</div><div class="v" id="t-media">—</div><div class="u">anos</div></div>
+    <div class="tile"><div class="k">Idade mediana</div><div class="v" id="t-mediana">—</div><div class="u">anos</div></div>
+    <div class="tile"><div class="k">Com data de nasc.</div><div class="v" id="t-nasc">—</div><div class="u" id="t-nasc-u"></div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Distribuição por faixa etária</h2>
+    <p class="sub">Calculada a partir da data de nascimento de cada paciente.</p>
+    <div class="toolbar"><button class="toggle" data-target="faixas">Ver tabela</button></div>
+    <div class="vbars" id="faixas-chart" role="img" aria-label="Histograma de pacientes por faixa etária"></div>
+    <div id="faixas-table" hidden></div>
+  </section>
+
+  <section class="panel">
+    <h2>Distribuição por sexo</h2>
+    <p class="sub">Campo de sexo do cadastro.</p>
+    <div class="toolbar"><button class="toggle" data-target="sexo">Ver tabela</button></div>
+    <div class="hbars" id="sexo-chart"></div>
+    <div class="legend" id="sexo-legend"></div>
+    <div id="sexo-table" hidden></div>
+  </section>
+
+  <section class="panel">
+    <h2>Comorbidades (estimativa)</h2>
+    <p class="sub" id="comorb-sub">Estimativa por palavra-chave em campos de texto livre — não é um dado clínico estruturado.</p>
+    <div class="toolbar"><button class="toggle" data-target="comorb">Ver tabela</button></div>
+    <div class="hbars" id="comorb-chart"></div>
+    <div id="comorb-table" hidden></div>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+/* ===========================================================================
+   STATS — SUBSTITUA este objeto pela saída de:
+     python3 .claude/skills/dfmed/scripts/dfmed.py dashboard-dados --full
+   O campo `exemplo: true` mostra o aviso de demonstração; remova-o (ou use
+   false) quando colar os dados reais.
+   =========================================================================== */
+const STATS = {
+  exemplo: true,
+  gerado_em: "2026-11-17",
+  total_pacientes: 1240,
+  idade_media: 44.8,
+  idade_mediana: 46,
+  sem_data_nascimento: 10,
+  sexo: { "Feminino": 742, "Masculino": 486, "Não informado": 12 },
+  faixas_etarias: { "0-12": 38, "13-17": 41, "18-29": 168, "30-39": 245, "40-49": 270, "50-59": 214, "60-69": 158, "70+": 96, "sem_data": 10 },
+  comorbidades: {
+    metodo: "estimativa por palavra-chave em campos de texto livre (ficha completa)",
+    pacientes_com_texto_analisado: 980,
+    contagem: { "Hipertensão": 318, "Diabetes": 196, "Dislipidemia": 142, "Obesidade": 121, "Hipotireoidismo": 88, "Depressão/Ansiedade": 77, "Asma": 44, "Cardiopatia": 39, "Tabagismo": 31, "Doença renal": 18 }
+  }
+};
+
+const FAIXA_ORDEM = ["0-12","13-17","18-29","30-39","40-49","50-59","60-69","70+"];
+const nf = new Intl.NumberFormat("pt-BR");
+const pct = (n, d) => d ? Math.round(n / d * 1000) / 10 : 0;
+const el = (id) => document.getElementById(id);
+
+function render() {
+  const S = STATS;
+  el("banner").hidden = !S.exemplo;
+  el("s-data").textContent = fmtData(S.gerado_em);
+  el("s-total").textContent = nf.format(S.total_pacientes);
+  el("t-total").textContent = nf.format(S.total_pacientes);
+  el("t-media").textContent = S.idade_media != null ? String(S.idade_media).replace(".", ",") : "—";
+  el("t-mediana").textContent = S.idade_mediana != null ? String(S.idade_mediana).replace(".", ",") : "—";
+  const comNasc = S.total_pacientes - (S.sem_data_nascimento || 0);
+  el("t-nasc").textContent = nf.format(comNasc);
+  el("t-nasc-u").textContent = pct(comNasc, S.total_pacientes) + "% do total";
+
+  renderFaixas(S);
+  renderSexo(S);
+  renderComorb(S);
+
+  const c = S.comorbidades || {};
+  el("comorb-sub").textContent =
+    `${c.metodo || "estimativa por palavra-chave"} · base de ${nf.format(c.pacientes_com_texto_analisado || 0)} pacientes com texto analisado.`;
+  el("foot").innerHTML =
+    "Dados agregados e anonimizados — nenhum paciente é identificado nesta página. " +
+    "Idade e sexo vêm direto do cadastro; comorbidades são uma estimativa por busca de termos em texto livre e podem conter falsos positivos/negativos. " +
+    "Fonte: prontuário DFMed (dfmed.app.br).";
+}
+
+function fmtData(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-");
+  return d && m && y ? `${d}/${m}/${y}` : iso;
+}
+
+function renderFaixas(S) {
+  const data = S.faixas_etarias || {};
+  const rows = FAIXA_ORDEM.map(k => [k, data[k] || 0]);
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  el("faixas-chart").innerHTML = rows.map(([k, v]) => `
+    <div class="vcol" title="${k} anos: ${nf.format(v)} pacientes (${pct(v, S.total_pacientes)}%)">
+      <div class="n">${v ? nf.format(v) : ""}</div>
+      <div class="bar" style="height:${(v / max * 100).toFixed(1)}%"></div>
+      <div class="x">${k}</div>
+    </div>`).join("");
+  el("faixas-table").innerHTML = tableHTML("Faixa etária", rows, S.total_pacientes,
+    (data["sem_data"] ? `${nf.format(data["sem_data"])} paciente(s) sem data de nascimento não entram nas faixas.` : ""));
+}
+
+function renderSexo(S) {
+  const colors = { "Feminino": "var(--c-fem)", "Masculino": "var(--c-masc)", "Não informado": "var(--c-ni)" };
+  const entries = Object.entries(S.sexo || {}).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  el("sexo-chart").innerHTML = entries.map(([k, v]) => `
+    <div class="hbar" title="${k}: ${nf.format(v)} (${pct(v, S.total_pacientes)}%)">
+      <div class="lbl">${k}</div>
+      <div class="track"><div class="fill" style="width:${(v / max * 100).toFixed(1)}%;background:${colors[k] || "var(--accent)"}"></div></div>
+      <div class="val">${nf.format(v)} <span>· ${pct(v, S.total_pacientes)}%</span></div>
+    </div>`).join("");
+  el("sexo-legend").innerHTML = entries.map(([k]) =>
+    `<span><i class="dot" style="background:${colors[k] || "var(--accent)"}"></i>${k}</span>`).join("");
+  el("sexo-table").innerHTML = tableHTML("Sexo", entries, S.total_pacientes);
+}
+
+function renderComorb(S) {
+  const data = (S.comorbidades && S.comorbidades.contagem) || {};
+  const base = (S.comorbidades && S.comorbidades.pacientes_com_texto_analisado) || S.total_pacientes;
+  const entries = Object.entries(data).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  if (!entries.length) {
+    el("comorb-chart").innerHTML = `<p style="color:var(--ink-3)">Nenhum termo de comorbidade encontrado nos campos de texto.</p>`;
+    el("comorb-table").innerHTML = "";
+    return;
+  }
+  el("comorb-chart").innerHTML = entries.map(([k, v]) => `
+    <div class="hbar" title="${k}: ${nf.format(v)} (${pct(v, base)}% dos analisados)">
+      <div class="lbl" title="${k}">${k}</div>
+      <div class="track"><div class="fill" style="width:${(v / max * 100).toFixed(1)}%;background:var(--accent)"></div></div>
+      <div class="val">${nf.format(v)} <span>· ${pct(v, base)}%</span></div>
+    </div>`).join("");
+  el("comorb-table").innerHTML = tableHTML("Comorbidade", entries, base, "% calculado sobre os pacientes com texto analisado.");
+}
+
+function tableHTML(col, rows, total, note) {
+  return `<table><caption>${note || ""}</caption>
+    <thead><tr><th>${col}</th><th class="num">Pacientes</th><th class="num">%</th></tr></thead>
+    <tbody>${rows.map(([k, v]) => `<tr><td>${k}</td><td class="num">${nf.format(v)}</td><td class="num">${pct(v, total)}%</td></tr>`).join("")}</tbody>
+  </table>`;
+}
+
+document.querySelectorAll("button.toggle").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const t = btn.dataset.target;
+    const tbl = el(t + "-table");
+    const chart = el(t + "-chart");
+    const leg = el(t + "-legend");
+    const show = tbl.hidden;
+    tbl.hidden = !show;
+    chart.hidden = show;
+    if (leg) leg.hidden = show;
+    btn.textContent = show ? "Ver gráfico" : "Ver tabela";
+  });
+});
+
+render();
+</script>
